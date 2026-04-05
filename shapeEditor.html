@@ -5,10 +5,162 @@
     <title>Shape Editor Website</title>
 </head>
 <body>
-    <svg style="width: 1000px; height: 1000px;"></svg>
+    <svg id="svgCanvas" style="width:1000px; height:500px; border:1px solid black;">
+        
+        <g id="cmdCreate">
+            <rect x="10" y="10" width="100" height="40" fill="grey" />
+            <text x="30" y="35" font-family="Arial" font-size="16" fill="white">Create</text>
+        </g>
+
+        <g id="cmdMove">
+            <rect x="120" y="10" width="100" height="40" fill="grey" />
+            <text x="150" y="35" font-family="Arial" font-size="16" fill="white">Move</text>
+        </g>
+
+        <g id="cmdDelete">
+            <rect x="230" y="10" width="100" height="40" fill="grey" />
+            <text x="250" y="35" font-family="Arial" font-size="16" fill="white">Delete</text>
+        </g>
+
+        
+        <g id="shapeRectangle" visibility="hidden">
+            <rect x="10" y="60" width="100" height="40" fill="blue" />
+            <text x="30" y="85" font-family="Arial" font-size="16" fill="white">Rectangle</text>
+        </g>
+
+        <g id="shapeCircle" visibility="hidden">
+            <rect x="120" y="60" width="100" height="40" fill="blue" />
+            <text x="140" y="85" font-family="Arial" font-size="16" fill="white">Circle</text>
+        </g>
+
+       
+        <text id="message" x="10" y="150" font-family="Arial" font-size="20" fill="black">Select a command</text>
+    </svg>
+
     <script>
+        const svg = document.getElementById("svgCanvas");
+        const shapeRectBtn = document.getElementById("shapeRectangle");
+        const shapeCircBtn = document.getElementById("shapeCircle");
+        const message = document.getElementById("message");
 
       
+        const shapes = [];
+
+        
+        let state = "idle";
+        let currentShapeType = null;
+        let selectedShape = null;
+
+        
+        document.getElementById("cmdCreate").addEventListener("click", () => {
+            shapeRectBtn.setAttribute("visibility", "visible");
+            shapeCircBtn.setAttribute("visibility", "visible");
+            message.textContent = "Select a shape type to create";
+            state = "idle";
+        });
+
+        document.getElementById("cmdMove").addEventListener("click", () => {
+            message.textContent = "Select a shape to move";
+            state = "selectToMove";
+        });
+
+        document.getElementById("cmdDelete").addEventListener("click", () => {
+            message.textContent = "Select a shape to delete";
+            state = "selectToDelete";
+        });
+
+        
+        shapeRectBtn.addEventListener("click", () => {
+            currentShapeType = "rectangle";
+            message.textContent = "Click on canvas to place rectangle";
+            state = "creatingRectangle";
+        });
+
+        shapeCircBtn.addEventListener("click", () => {
+            currentShapeType = "circle";
+            message.textContent = "Click on canvas to place circle";
+            state = "creatingCircle";
+        });
+
+        function createShape(type, x, y) {
+            let shape;
+            if(type === "rectangle") {
+                shape = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                shape.setAttribute("x", x - 25);
+                shape.setAttribute("y", y - 25);
+                shape.setAttribute("width", 50);
+                shape.setAttribute("height", 50);
+                shape.setAttribute("fill", "orange");
+            } else if(type === "circle") {
+                shape = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                shape.setAttribute("cx", x);
+                shape.setAttribute("cy", y);
+                shape.setAttribute("r", 25);
+                shape.setAttribute("fill", "green");
+            }
+            shape.setAttribute("stroke", "black");
+            svg.appendChild(shape);
+            shapes.push(shape);
+            return shape;
+        }
+
+        svg.addEventListener("click", (e) => {
+            const rect = svg.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            if(state === "creatingRectangle" || state === "creatingCircle") {
+                createShape(currentShapeType, x, y);
+                state = "idle";
+                message.textContent = "Shape created! Select a command";
+                shapeRectBtn.setAttribute("visibility", "hidden");
+                shapeCircBtn.setAttribute("visibility", "hidden");
+            } else if(state === "selectToMove") {
+                selectedShape = shapes.find(s => s.tagName === "rect" ?
+                    x >= parseFloat(s.getAttribute("x")) && x <= parseFloat(s.getAttribute("x")) + parseFloat(s.getAttribute("width")) &&
+                    y >= parseFloat(s.getAttribute("y")) && y <= parseFloat(s.getAttribute("y")) + parseFloat(s.getAttribute("height"))
+                    :
+                    Math.hypot(x - parseFloat(s.getAttribute("cx")), y - parseFloat(s.getAttribute("cy"))) <= parseFloat(s.getAttribute("r"))
+                );
+
+                if(selectedShape) {
+                    message.textContent = "Click new location to move shape";
+                    state = "placingShape";
+                    
+                    selectedShape.setAttribute("stroke", "red");
+                    selectedShape.setAttribute("stroke-width", "3");
+                }
+            } else if(state === "placingShape") {
+                if(selectedShape.tagName === "rect") {
+                    selectedShape.setAttribute("x", x - 25);
+                    selectedShape.setAttribute("y", y - 25);
+                } else if(selectedShape.tagName === "circle") {
+                    selectedShape.setAttribute("cx", x);
+                    selectedShape.setAttribute("cy", y);
+                }
+                selectedShape.setAttribute("stroke", "black");
+                selectedShape.setAttribute("stroke-width", "1");
+                selectedShape = null;
+                state = "idle";
+                message.textContent = "Shape moved! Select a command";
+            } else if(state === "selectToDelete") {
+                const shapeToDelete = shapes.find((s, i) => {
+                    if(s.tagName === "rect") {
+                        return x >= parseFloat(s.getAttribute("x")) && x <= parseFloat(s.getAttribute("x")) + parseFloat(s.getAttribute("width")) &&
+                               y >= parseFloat(s.getAttribute("y")) && y <= parseFloat(s.getAttribute("y")) + parseFloat(s.getAttribute("height"));
+                    } else if(s.tagName === "circle") {
+                        return Math.hypot(x - parseFloat(s.getAttribute("cx")), y - parseFloat(s.getAttribute("cy"))) <= parseFloat(s.getAttribute("r"));
+                    }
+                    return false;
+                });
+                if(shapeToDelete) {
+                    svg.removeChild(shapeToDelete);
+                    shapes.splice(shapes.indexOf(shapeToDelete), 1);
+                    message.textContent = "Shape deleted! Select a command";
+                    state = "idle";
+                }
+            }
+        });
     </script>
 </body>
 </html>
